@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SecondAssignment.Services;
 
@@ -5,6 +6,7 @@ namespace SecondAssignment.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class BooksController : ControllerBase
 {
     private readonly IBookService _bookService;
@@ -16,6 +18,7 @@ public class BooksController : ControllerBase
     
     [HttpGet]
     [ResponseCache(Duration = 60, Location = ResponseCacheLocation.Client)]
+    [Authorize(Roles = "Admin,User")]
     public async Task<IActionResult> GetBooks(int page = 1, int pageSize = 10)
     {
         if (page < 1 || pageSize < 1)
@@ -27,6 +30,7 @@ public class BooksController : ControllerBase
     
     [HttpGet("{id}")]
     [ResponseCache(Duration = 60, Location = ResponseCacheLocation.Client)]
+    [Authorize(Roles = "Admin,User")]
     public async Task<IActionResult> GetBook(int id)
     {
         if (id < 1)
