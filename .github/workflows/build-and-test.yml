@@ -1,0 +1,118 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    # Service container for PostgreSQL database
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: admin
+          POSTGRES_DB: BooksDb
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    # Step 1: Checkout code from repository
+    - uses: actions/checkout@v3
+    
+    # Step 2: Setup .NET SDK (target framework version)
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '10.0.x'
+    
+    # Step 3: Restore NuGet dependencies
+    - name: Restore dependencies
+      run: dotnet restore
+      working-directory: ./SecondAssignment/SecondAssignment
+    
+    # Step 4: Build the application
+    - name: Build
+      run: dotnet build --configuration Release --no-restore
+      working-directory: ./SecondAssignment/SecondAssignment
+    
+    # Step 5: Run database migrations
+    - name: Run migrations
+      run: dotnet ef database update
+      working-directory: ./SecondAssignment/SecondAssignment
+      env:
+        ASPNETCORE_ENVIRONMENT: Development
+    
+    # Step 6: Run unit tests
+    - name: Run tests
+      run: dotnet test --configuration Release --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx"
+      working-directory: ./SecondAssignment/SecondAssignment
+      env:
+        ASPNETCORE_ENVIRONMENT: Development
+    
+    # Step 7: Upload test results
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-results
+        path: ./SecondAssignment/SecondAssignment/**/test-results.trx
+    
+    # Step 8: Code coverage analysis (optional)
+    - name: Install coverage tools
+      run: dotnet tool install --global dotnet-reportgenerator-globaltool
+    
+    # Step 9: Generate coverage reports
+    - name: Run tests with coverage
+      run: dotnet test --configuration Release --no-build /p:CollectCoverage=true /p:CoverageFormat=opencover --logger "trx"
+      working-directory: ./SecondAssignment/SecondAssignment
+      env:
+        ASPNETCORE_ENVIRONMENT: Development
+      continue-on-error: true
+
+  # Security scanning job (optional enhancement)
+  security-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Run Sonarqube analysis
+      uses: SonarSource/sonarcloud-github-action@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      continue-on-error: true
+
+  # Deploy job (triggered on successful build to main branch)
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '10.0.x'
+    
+    - name: Build for deployment
+      run: dotnet publish --configuration Release --output ./publish
+      working-directory: ./SecondAssignment/SecondAssignment
+    
+    - name: Deploy to server (example - customize for your environment)
+      run: echo "Deploying to production server..."
+      # Example: scp, docker push, AWS deployment, Azure App Service, etc.
+      continue-on-error: true
